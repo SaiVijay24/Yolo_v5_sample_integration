@@ -47,13 +47,23 @@ from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, time_sync
 from torchvision import datasets, models, transforms
 
+# ===== RE-IDENTIFICATION SETUP =====
+# Transform pipeline for re-identification: resize detected objects to standard person re-ID dimensions (256x128),
+# convert to tensor, and normalize using ImageNet statistics
 data_transforms_re_id = transforms.Compose([
-        transforms.Resize((256, 128), interpolation=3),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Resize((256, 128), interpolation=3),  # Resize to standard re-ID input size
+        transforms.ToTensor(),  # Convert PIL Image to tensor
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])  # ImageNet normalization
 ])
+
+# Load pre-trained re-identification model (TorchScript format for optimized inference)
+# This model extracts 512-dimensional feature embeddings from detected objects
 loaded_trace = torch.jit.load("model_jit.pth")
-dum_emb=torch.rand([10,512]).cuda()
+
+# Dummy embeddings database: 10 random 512-dimensional feature vectors
+# TODO: Replace with real person/object embeddings database for production use
+dum_emb = torch.rand([10, 512]).cuda()
+# ===== END RE-IDENTIFICATION SETUP =====
 
 @torch.no_grad()
 def run(
@@ -170,18 +180,33 @@ def run(
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
                 
                 for *xyxy, conf, cls in reversed(det):
-                    x1,y1,x2,y2=xyxy 
-                    # pdb.set_trace()
+                    # ===== RE-IDENTIFICATION PROCESSING =====
+                    # Extract bounding box coordinates
+                    x1, y1, x2, y2 = xyxy 
+                    
+                    # Crop the detected object from the original image
                     from PIL import Image   
-                    crop_1=Image.fromarray(imc[int(y1.item()):int(y2.item()),int(x1.item()):int(x2.item())])
-                    applied_trans=torch.unsqueeze(data_transforms_re_id(crop_1),0).cuda () #to pass through the re_id fetaure extractor
+                    crop_1 = Image.fromarray(imc[int(y1.item()):int(y2.item()), int(x1.item()):int(x2.item())])
+                    
+                    # Apply re-ID transformations (resize to 256x128, normalize) and add batch dimension
+                    applied_trans = torch.unsqueeze(data_transforms_re_id(crop_1), 0).cuda()
+                    
+                    # Extract feature embedding and find matching identity
                     with torch.no_grad():
-                        embed=loaded_trace(applied_trans)
-                        embed_normalize=torch.nn.functional.normalize(embed)
-                        normalized=torch.matmul(embed_normalize,dum_emb.transpose(1,0)).argsorts()
-                        print(normalized[0],"is the most similar element")
-                        # pdb.set_trace()
-                    pdb.set_trace() #to apply the transformations and then the 
+                        # Get 512-D feature embedding from re-ID model
+                        embed = loaded_trace(applied_trans)
+                        
+                        # Normalize embedding for cosine similarity computation
+                        embed_normalize = torch.nn.functional.normalize(embed)
+                        
+                        # Compute similarity scores with all database embeddings (cosine similarity)
+                        normalized = torch.matmul(embed_normalize, dum_emb.transpose(1, 0)).argsort()
+                        print(normalized[0], "is the most similar element")
+                    
+                    # NOTE: Remove the following line for production use (debug breakpoint)
+                    pdb.set_trace()
+                    # ===== END RE-IDENTIFICATION PROCESSING =====
+                    
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                         line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
