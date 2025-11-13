@@ -57,7 +57,19 @@ YOLOv5 🚀 is a family of object detection architectures and models pretrained 
 
 </div>
 
+> **🎯 Custom Integration Notice**  
+> This is a YOLOv5 implementation with **custom re-identification (re-ID) integration**.  
+> The standard YOLOv5 object detection is enhanced with person/object re-identification capabilities.
+>
+> **New to this repo?** Check out:
+> - **[QUICK_START.md](QUICK_START.md)** - Quick setup and usage guide
+> - **[CODE_EXPLANATION.md](CODE_EXPLANATION.md)** - Comprehensive code documentation
+
 ## <div align="center">Documentation</div>
+
+**📚 New to this repository?**
+- [QUICK_START.md](QUICK_START.md) - Get started in 5 minutes
+- [CODE_EXPLANATION.md](CODE_EXPLANATION.md) - Detailed code documentation
 
 See the [YOLOv5 Docs](https://docs.ultralytics.com) for full documentation on training, testing and deployment.
 
